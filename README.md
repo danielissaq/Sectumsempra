@@ -50,6 +50,16 @@ ip a show tun0
 
 ## Complete Attack Workflow
 
+### Running in a New Tab After NetWeave
+If you just completed your NetWeave scan and opened a brand new terminal tab to run Sectumsempra parallelly, execute these commands first to sync your environment:
+
+```bash
+cd ~/Final_Suite_Test/Sectumsempra
+source .venv/bin/activate
+```
+
+### Standard Execution Steps
+
 1. Scout with NetWeave
 
 Launch your reconnaissance framework against the remote host:
