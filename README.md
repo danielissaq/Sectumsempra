@@ -23,6 +23,7 @@ python -m pip install netifaces
 ```
 
 ### 3. Verify Attack Interface
+Sectumsempra automatically tracks local network topology to bind your listening interface. It will prioritize your TryHackMe VPN tunnel (tun0), but will seamlessly fall back to your local LAN/WLAN interface IP if the tunnel is inactive:
 ```bash
 ip a show tun0
 ```
