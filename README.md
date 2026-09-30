@@ -30,19 +30,19 @@ ip a show tun0
 
 ## Complete Attack Workflow
 
-1. **Scout with NetWeave:** Run reconnaissance in your primary terminal:
+1. **Scout with NetWeave:** Run reconnaissance in your primary terminal tab:
 ```bash
 python pwn_recon.py
 ```
 
-2. **Launch Sectumsempra:** Open a separate terminal and execute:
+2. **Launch Sectumsempra:** Open a second terminal tab and execute:
 ```bash
 cd ~/Sectumsempra
 source .venv/bin/activate
 python3 sectumsempra.py
 ```
 
-3. **Start Listener:** Open a third terminal to start netcat:
+3. **Start Listener:** Open a third terminal tab to start netcat:
 ```bash
 nc -lvnp 4444
 ```
