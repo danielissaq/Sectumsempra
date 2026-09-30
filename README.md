@@ -1,46 +1,94 @@
-Sectumsempra v1.0
+# Sectumsempra v1.0
 
-Sectumsempra is an automated attack script and payload framework engineered for CTF challenges. It takes target parameters and crafts multi platform scripts to capture reverse shells and handle privilege escalation.
+**Sectumsempra** is a fast automated attack execution and post exploitation framework engineered for CTFs, labs and authorized assessments.
 
-Complete Attack Workflow
+### IMPORTANT: Use NetWeave first to map the target and find the attack vector, then launch Sectumsempra to slash through and capture the flags.
 
-Follow these exact steps to use NetWeave and Sectumsempra together in a TryHackMe room.
+Turn a correlated attack path into active reverse shells and a ready privilege escalation pipeline.
 
-Step 1 Scout the Target with NetWeave
-Run your reconnaissance framework to find the exploit path
-python pwn_recon.py
-Input the target IP when prompted. NetWeave will scan open web ports and output the best entry point under the section THE GOLDEN PATH.
+TARGET
+  │
+  ▼
+ATTACK PATH
+  │
+  ▼
+FOOTHOLD PAYLOAD
+  │
+  ▼
+REVERSE SHELL
+  │
+  ▼
+PRIVILEGE ESCALATION
 
-Step 2 Fire up Sectumsempra
-Launch this framework to build your attack payload files
-python3 sectumsempra.py
-1. Input the same target IP address.
-2. Press Enter to use the default listener port 4444.
-The script automatically builds two tailored exploit deployment assets in your folder:
-- sectum_linux_strike_[IP].sh
-- sectum_win_strike_[IP].ps1
+Sectumsempra ingests target parameters, automatically maps active local routing interfaces, builds tailored multi platform exploit vectors and stages immediate post exploitation discovery scripts.
 
-Step 3 Start Your Netcat Listener
-Open a separate terminal window or tab in Kali and start the listener to catch the connection
-nc -lvnp 4444
+## Deployment
 
-Step 4 Execute the Exploit
-Deploy the commands generated inside your strike files against the vulnerability found by NetWeave. 
+### 1. Clone Sectumsempra
 
-Step 5 Catch the Shell and Escalate
-Once the target connects back to your Netcat terminal, you have initial access. Run the pre staged command displayed in your terminal to download and execute local privilege escalation scanners to find and grab the root flags immediately.
-
-Deployment
 git clone https://github.com
 cd Sectumsempra
+
+### 2. Set up Python
+
 python3 -m venv .venv
 source .venv/bin/activate
-pip install netifaces
+python -m pip install --upgrade pip
+python -m pip install netifaces
 
-Requirements
-Python 3.10 plus
+### 3. Verify Attack Interface
+
+Sectumsempra automatically tracks local network topology to bind your listening interface. Ensure your TryHackMe VPN tunnel is active:
+
+ip a show tun0
+
+## Complete Attack Workflow
+
+### 1. Scout with NetWeave
+
+Launch your reconnaissance framework against the remote host:
+
+python pwn_recon.py
+
+Locate the optimal entry point provided under the GOLDEN PATH analysis output.
+
+### 2. Launch Sectumsempra
+
+Run the attack script to frame your exploitation assets:
+
+python3 sectumsempra.py
+
+Input the target IP address and specify your local listener port when prompted.
+
+### 3. Start Listener
+
+Open a separate terminal window or tab in Kali Linux and host the receiver socket:
+
+nc -lvnp 4444
+
+### 4. Deploy Asset
+
+Execute the generated command sequence against the vulnerability vector exposed during the scouting phase.
+
+### 5. Execute Privilege Escalation
+
+Once the active connection drops back into your netcat listener terminal window enter the staged network link string to immediately push the PEAS discovery utility onto the target file system and grab root context.
+
+## Generated Payload
+
+After parameters are processed Sectumsempra compiles custom raw execution scripts in your local working directory:
+
+sectum_linux_strike_<target>.sh
+sectum_win_strike_<target>.ps1
+
+## Requirements
+
+Python 3.10+
 netifaces library
 Netcat listener backend
 
-Legal Notice
-Developed strictly for educational laboratories and authenticated cybersecurity research.
+## Legal Notice
+
+Sectumsempra is intended for CTFs, security research, authorized assessments and isolated laboratory environments.
+
+Only use Sectumsempra against systems you own or have explicit permission to test.
