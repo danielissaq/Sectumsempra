@@ -1,6 +1,6 @@
 # Sectumsempra v1.0
 
-**Sectumsempra** is an automated attack execution and post-exploitation framework engineered for CTFs, labs, and authorized assessments, designed to immediately weaponize the findings provided by the NetWeave reconnaissance engine.
+**Sectumsempra** is an automated attack execution and post exploitation framework engineered for CTFs, labs, and authorized assessments, designed to immediately weaponize the findings provided by the NetWeave reconnaissance engine.
 
 ```text
 TARGET ──► ATTACK PATH ──► FOOTHOLD PAYLOAD ──► REVERSE SHELL ──► PRIVILEGE ESCALATION
@@ -52,7 +52,7 @@ Before executing any attack payloads on the target system, open a separate termi
 nc -lvnp 4444
 ```
 
-### 4. Post-Exploitation Sequence (Active Shell Tab)
+### 4. Post Exploitation Sequence (Active Shell Tab)
 Execute the payload script compiled by Sectumsempra against the target vulnerability vector discovered during the NetWeave phase. Once the active connection drops back into your waiting Netcat listener tab, copy and execute the embedded automated privilege escalation engine:
 
 **For Linux Targets (LinPEAS Live Memory Stager):**
