@@ -10,7 +10,7 @@ TARGET ──► ATTACK PATH ──► FOOTHOLD PAYLOAD ──► REVERSE SHELL 
 
 ### 1. Clone & Setup
 ```bash
-git clone https://github.com/danielissaq/Sectumsempra.git
+git clone https://github.com
 cd Sectumsempra
 ```
 
@@ -23,7 +23,7 @@ python -m pip install netifaces
 ```
 
 ### 3. Verify Attack Interface
-Sectumsempra automatically tracks local network topology to bind your listening interface. It will prioritize your TryHackMe VPN tunnel (tun0), but will seamlessly fall back to your local LAN/WLAN interface IP if the tunnel is inactive:
+Verifies network topology and `tun0`:
 ```bash
 ip a show tun0
 ```
@@ -35,19 +35,19 @@ ip a show tun0
 python pwn_recon.py
 ```
 
-2. **Launch Sectumsempra:** In a separate terminal, navigate and execute:
+2. **Launch Sectumsempra:** Open a separate terminal and execute:
 ```bash
 cd ~/Sectumsempra
 source .venv/bin/activate
 python3 sectumsempra.py
 ```
 
-3. **Start Listener:** Initialize your netcat handler:
+3. **Start Listener:** Open a third terminal to start netcat:
 ```bash
 nc -lvnp 4444
 ```
 
-4. **Deploy Asset & Escalate:** Execute the payload and push post-exploitation scripts.
+4. **Deploy Asset & Escalate:** Execute payload and push post-exploitation scripts.
 
 ## Generated Payload
 Generates scripts such as `sectum_linux_strike_<target>.sh` and `sectum_win_strike_<target>.ps1`.
