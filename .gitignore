@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+*.pyc
+sectum_linux_strike_*.sh
+sectum_win_strike_*.ps1
