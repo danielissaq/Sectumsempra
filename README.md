@@ -80,4 +80,4 @@ Netcat listener backend
 ```
 
 ## Legal Notice
-For authorized assessments and labs only against systems you have explicit permission to test.
+Sectumsempra is strictly intended for CTFs, security research, authorized assessments, and isolated laboratory environments. Only use NetWeave against systems you own or have explicit permission to test.
