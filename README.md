@@ -10,7 +10,7 @@ TARGET ──► ATTACK PATH ──► FOOTHOLD PAYLOAD ──► REVERSE SHELL 
 
 ### 1. Clone & Setup
 ```bash
-git clone https://github.com
+git clone https://github.com/danielissaq/Sectumsempra.git
 cd Sectumsempra
 ```
 
