@@ -8,66 +8,44 @@ TARGET ──► ATTACK PATH ──► FOOTHOLD PAYLOAD ──► REVERSE SHELL 
 
 ## Deployment
 
-### 1. Clone Sectumsempra
+### 1. Clone & Setup
 ```bash
 git clone https://github.com/danielissaq/Sectumsempra.git
 cd Sectumsempra
-```
-
-### 2. Set up Python
-```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install netifaces
 ```
 
-### 3. Verify Attack Interface
-Ensure your VPN tunnel is active:
+### 2. Verify Attack Interface
 ```bash
 ip a show tun0
 ```
 
 ## Complete Attack Workflow
 
-### Multi-Terminal Execution
-For the optimal operational workflow, maintain your active NetWeave results screen in your primary terminal, and open a secondary terminal window or tab to manage execution.
-
-### Execution Sequence
-
-1. **Scout with NetWeave:** In your first terminal window, launch your reconnaissance core against the host to pinpoint the active exposure point under the GOLDEN PATH output:
+1. **Scout with NetWeave:** Run reconnaissance in your primary terminal:
 ```bash
 python pwn_recon.py
 ```
-
-2. **Launch Sectumsempra:** Open a second terminal window or tab, enter the project workspace, activate the environment, and initialize the payload compiler:
+2. **Launch Sectumsempra:** In a separate terminal, navigate and execute:
 ```bash
-cd ~/Final_Automation_Test/Sectumsempra
+cd ~/Sectumsempra
 source .venv/bin/activate
 python3 sectumsempra.py
 ```
-Input the targeted IP address and assign your designated incoming shell port when prompted.
-
-3. **Start Listener:** In a separate listener terminal window or tab, initialize your netcat socket handler to receive the incoming connection loop:
+3. **Start Listener:** Initialize your netcat handler:
 ```bash
 nc -lvnp 4444
 ```
-
-4. **Deploy Asset & Escalate:** Execute the tailored deployment payload against the target component exposed by NetWeave. Once the active terminal session drops back into your netcat listener, trigger the staged environment audit line to map out local paths.
+4. **Deploy Asset & Escalate:** Execute the payload and push post-exploitation scripts.
 
 ## Generated Payload
-Compiles standard functional execution vectors within your immediate working path:
-```text
-sectum_linux_strike_<target>.sh
-sectum_win_strike_<target>.ps1
-```
+Generates scripts such as `sectum_linux_strike_<target>.sh` and `sectum_win_strike_<target>.ps1`.
 
 ## Requirements
-```text
-Python 3.10+
-netifaces library
-Netcat listener backend
-```
+Python 3.10+, `netifaces`, and a netcat listener.
 
 ## Legal Notice
 For authorized assessments and labs only against systems you have permission to test.
