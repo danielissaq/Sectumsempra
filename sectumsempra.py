@@ -1,8 +1,3 @@
----
-
-## Tool 2/3: Sectumsempra v1.2
-
-```python
 #!/usr/bin/env python3
 """
 Sectumsempra v1.2 - Green Engine
@@ -23,6 +18,7 @@ from typing import Optional, Dict, Any
 try:
     from rich.console import Console
     from rich.panel import Panel
+    from rich.text import Text
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
@@ -37,7 +33,7 @@ class Sectumsempra:
         self.contract_file: Optional[str] = None
         
     def banner(self):
-        banner = """
+        banner = r"""
     ███████╗███████╗ ██████╗████████╗██╗   ██╗███╗   ███╗███████╗███████╗███╗   ███╗██████╗ ██████╗  █████╗ 
     ██╔════╝██╔════╝██╔════╝╚══██╔══╝██║   ██║████╗ ████║██╔════╝██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔══██╗
     ███████╗█████╗  ██║        ██║   ██║   ██║██╔████╔██║███████╗█████╗  ██╔████╔██║██████╔╝██████╔╝███████║
@@ -146,15 +142,56 @@ class Sectumsempra:
         
         proc = await asyncio.create_subprocess_exec(
             sys.executable, 'morsmordre.py',
-            stdin=reader,
-            stdout=writer,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env
         )
         
-        await proc.wait()
-        writer.close()
-        await writer.wait_closed()
+        async def socket_to_proc():
+            try:
+                while True:
+                    data = await reader.read(4096)
+                    if not data:
+                        break
+                    proc.stdin.write(data)
+                    await proc.stdin.drain()
+            except:
+                pass
+            finally:
+                try:
+                    proc.stdin.close()
+                except:
+                    pass
+        
+        async def proc_to_socket():
+            try:
+                while True:
+                    data = await proc.stdout.read(4096)
+                    if not data:
+                        break
+                    writer.write(data)
+                    await writer.drain()
+            except:
+                pass
+        
+        try:
+            await asyncio.gather(socket_to_proc(), proc_to_socket())
+        except:
+            pass
+        
+        try:
+            proc.terminate()
+            await proc.wait()
+        except:
+            pass
+            
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except:
+            pass
+            
         self.status("Session closed", "warning")
     
     async def start_listener(self):
